@@ -1,0 +1,4 @@
+annTrans is an annotation transfer tool designed to annotate de novo transcriptome assemblies
+The tool is designed to incorporate large flexibility and be applicable to wide range of biological contexts of transcriptome assembly tasks, from annotating of an entirely new genome to generating a more accurate genome annotation of a particular strain of a well-studied model organism. 
+To achieve this flexibility, annTrans combines: a) leveraging of existing functional genome annotation for de novo assembly annotation, b) incorporating functional predictions for novel genomic features, c) fine-tunable process of matching the predicted and known genomic features. 
+
