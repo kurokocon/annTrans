@@ -356,11 +356,7 @@ void overlapByRate(vector<vector<int> >& ret, vector<featureLine>& query, vector
 	for (vector<featureLine>::const_iterator i = query.cbegin();i != query.cend();i++) {
 		ret.push_back(vector<int>());
 		int qoverlap = queryoverlap >= 0 ? (i->end - i->start) * queryoverlap : numeric_limits<int>::max();
-		bool test = false;
-		if (i->start == 132144) {
-			cout << "Required overlap: " << qoverlap << "\n";
-			test = true;
-		}
+		
 		for (vector<featureLine>::const_iterator j = subject.cbegin();j != subject.cend();j++) {
 			//cout << "i:" << i->start << "-" << i->end << ", j:" << j->start << "-" << j->end << "\n";
 
