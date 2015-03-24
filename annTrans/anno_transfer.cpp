@@ -363,14 +363,14 @@ void overlapByRate(vector<vector<int> >& ret, vector<featureLine>& query, vector
 			int soverlap = subjectoverlap >= 0 ? (j->end - j->start) * subjectoverlap : numeric_limits<int>::max();
 			if (j->start > i->end) break;
 			if (j->end <= i->end) {
-				if (j->end - max(i->start, j->start) >= min(qoverlap, soverlap)) {
+				if (j->end - max(i->start, j->start) >= max(qoverlap, soverlap)) {
 					ret[ret.size() - 1].push_back(j - subject.begin()); 
 					
 					//cout << "included" << "\n";
 					//cout << "i:" << i->start << "-" << i->end << ", j:" << j->start << "-" << j->end << "\n";
 					}
 			}
-			else if (i->end - max(j->start, i->start) >= min(qoverlap, soverlap)){
+			else if (i->end - max(j->start, i->start) >= max(qoverlap, soverlap)){
 				ret[ret.size() - 1].push_back(j - subject.begin());
 				
 
