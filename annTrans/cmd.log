@@ -1,1 +1,1 @@
-../test/anno_transfer --target tri144.pasa_assemblies.gff3 --source tri144.gene_structures_post_PASA_updates.73255.gff3 --output sample --genome-sequence genome_S288C_R64.fsa --target-overlap 1.0 --source-overlap 1.0  --force-unsupported > transfer.log 2>&1 &
+../test/anno_transfer --target tri144.pasa_assemblies.gff3 --source tri144.gene_structures_post_PASA_updates.73255.gff3 --output sample --genome-sequence genome_S288C_R64.fsa --target-overlap 1.0 --source-overlap 1.0  --force-unsupported-features > transfer.log 2>&1 &
