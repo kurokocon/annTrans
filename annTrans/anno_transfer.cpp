@@ -245,9 +245,9 @@ int main(int argc, char* argv[]) {
 				transferred = true;
 			 }
 			 else {
-				
+				// If not been marked ncRNA feature
 				  if (ncRNA_line == NULL) {
-				    string id = string_match(sourceLines[indexj].attr, "ID");
+				    	string id = string_match(sourceLines[indexj].attr, "ID");
 					ncRNA_line = new featureLine(targetLines[indexi]);
 					ncRNA_line->attr += ";gene=" + id;
 					ncRNA_line->type = "ncRNA";
@@ -263,6 +263,9 @@ int main(int argc, char* argv[]) {
 			output.push_back(*ncRNA_line);
 			ncRNA_line->type = "exon";
 			output.push_back(*ncRNA_line);
+		}
+		// free memory
+		if (ncRNA_line != NULL) {
 			delete ncRNA_line;
 			ncRNA_line = NULL;
 		}
