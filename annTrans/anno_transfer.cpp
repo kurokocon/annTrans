@@ -183,14 +183,13 @@ int main(int argc, char* argv[]) {
   if (targetPref) sourceOverlap = -1.0;
   if (force_unsupported_features) {
 	 anyOverlap(pairs, targetLines, sourceLines);
-	for (int i = 0;i < sourceLines.size();i++) unsupported.push_back(i);
+	for (size_t i = 0;i < sourceLines.size();i++) unsupported.push_back(i);
   }
   else {
 	 overlapByRate(pairs, targetLines, sourceLines, targetOverlap, sourceOverlap);
   }
   
   vector<int> listLines;
-  int lastncRNA = -1;
   bool transferred = false;
   vector<string> dupLog;
   vector<string> transLog;
@@ -199,6 +198,7 @@ int main(int argc, char* argv[]) {
 	 bool annotated = false;
 	 int indexi = i - pairs.begin();
 	 transferred = false;
+	 featureLine* ncRNA_line = NULL;
 	 cout << "Processing line " << indexi << ": " << targetLines[indexi].seqname << ", " << targetLines[indexi].start << "-" << targetLines[indexi].end << ", " << targetLines[indexi].attr << "\n";
 	 if (!i->empty()/* && find(goodseq.begin(), goodseq.end(), targetLines[indexi].seqname) != goodseq.end()*/) {
 		for (vector<int>::iterator j = i->begin();j != i->end();j++) {
@@ -242,24 +242,29 @@ int main(int argc, char* argv[]) {
 				  listLines.push_back(indexk);
 				  
 				}
+				transferred = true;
 			 }
 			 else {
-				//if (indexi != lastncRNA) {
-				if (!transferred) {
-				  lastncRNA = indexi;
-				  cout << "Range " << targetLines[indexi].start << "-" << targetLines[indexi].end << " marked as ncRNA from range " << sourceLines[indexj].start << "-" << sourceLines[indexj].end << "\n";
-				  string id = string_match(sourceLines[indexj].attr, "ID");
-
-				  featureLine line = targetLines[indexi];
-				  line.attr += ";gene=" + id;
-				  line.type = "ncRNA";
-				  output.push_back(line);
-				  line.type = "exon";
-				  output.push_back(line);
-				}
+				
+				  if (ncRNA_line == NULL) {
+				    string id = string_match(sourceLines[indexj].attr, "ID");
+					ncRNA_line = new featureLine(targetLines[indexi]);
+					ncRNA_line->attr += ";gene=" + id;
+					ncRNA_line->type = "ncRNA";
+				  }
+				
 			 }
-			 transferred = true;
+			 
 		  }
+		}
+		// no matched feature with the same strand, check if ncRNA found
+		if (!transferred && ncRNA_line != NULL) {
+			cout << "Range " << ncRNA_line->start << "-" << ncRNA_line->end << " marked as ncRNA" << "\n";
+			output.push_back(*ncRNA_line);
+			ncRNA_line->type = "exon";
+			output.push_back(*ncRNA_line);
+			delete ncRNA_line;
+			ncRNA_line = NULL;
 		}
 	 }
 	 if (!annotated) {
@@ -276,7 +281,7 @@ int main(int argc, char* argv[]) {
   }
   if (force_unsupported_features) {
 	cout << "Transferring unsupported features" << "\n";
-	for (int i = 0;i < unsupported.size();i++) {
+	for (size_t i = 0;i < unsupported.size();i++) {
 		cout << sourceLines[unsupported[i]].start << "-" << sourceLines[unsupported[i]].end << ":" << sourceLines[unsupported[i]].type << "\n";
 		output.push_back(sourceLines[unsupported[i]]);
 	}
@@ -497,4 +502,3 @@ void writeOutput(string filename, vector<featureLine>& output) {
 	file.clear();
 	file.close();
 }
-
