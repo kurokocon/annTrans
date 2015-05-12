@@ -11,6 +11,7 @@
 #include <getopt.h>
 #include <limits>
 #include <cstdlib>
+#include <functional>
 
 using namespace std;
 
@@ -37,7 +38,9 @@ struct _sortByStart {
 
 void readFile(string filename, vector<featureLine>& lines); 
 
-void overlapByRate(vector<vector<int> >& ret, vector<featureLine>& query, vector<featureLine>& subject, double queryoverlap, double subjectoverlap);
+void overlapByRate(vector<vector<int> >& ret, vector<featureLine>& query, vector<featureLine>& subject, double queryoverlap, double subjectoverlap, std::function<bool(const featureLine& i, const featureLine& j)> f);
+
+
 void anyOverlap(vector<vector<int> >& ret, vector<featureLine>& query, vector<featureLine>& subject) {
   stable_sort(subject.begin(), subject.end(), sortByStart);
   for (vector<featureLine>::iterator i = query.begin();i != query.end();i++) {
@@ -85,6 +88,9 @@ int main(int argc, char* argv[]) {
   string outFile = "";
   double targetOverlap = -1.0;
   double sourceOverlap = -1.0;
+  // ncRNA overlaps
+  double ncTargetOverlap = -1.0;
+  double ncSourceOverlap = -1.0;
   bool in_test_mode = false;
   bool targetPref = false;
   while (1) {
@@ -99,6 +105,9 @@ int main(int argc, char* argv[]) {
 		{"target-overlap", required_argument, NULL, 6},
 		{"source-overlap", required_argument, NULL, 7},
 		{"test", no_argument, NULL, 8},
+		// Adding options for opposite strand
+		{"nc-target-overlap", required_argument, NULL, 9},
+		{"nc-source-overlap", required_argument, NULL, 10},
 		{0,0,0,0}
 	 };
 	 int c = getopt_long(argc, argv, "", options, &option_index);
@@ -131,6 +140,13 @@ int main(int argc, char* argv[]) {
 		case 8:
 		  in_test_mode = true;
 		  break;
+		// Options for ncRNA
+		case 9:
+			ncTargetOverlap = atof(optarg);
+			break;
+		case 10:
+			ncSourceOverlap = atof(optarg);
+			break;
 		default:
 		  break;	
 	 }
@@ -141,7 +157,8 @@ int main(int argc, char* argv[]) {
   //    string seqFile = "";
   //      string outFile = "";
   //
-  if (targetFile == "" || sourceFile == "" || seqFile == "" || outFile == "" || sourceOverlap == -1.0 || targetOverlap == -1.0) {
+  if (targetFile == "" || sourceFile == "" || seqFile == "" || outFile == "" || sourceOverlap == -1.0 || targetOverlap == -1.0
+  || ncSourceOverlap == -1.0 || ncTargetOverlap == -1.0) {
 	cerr << "Argument incomplete: please see usage" << endl;
 	return 1;
   }
@@ -179,6 +196,7 @@ int main(int argc, char* argv[]) {
   //readFile(argv[1], targetLines);
   //readFile(argv[2], sourceLines);
   vector<vector<int> > pairs;
+  vector<vector<int>> nc_pairs;
   vector<int> unsupported;
   if (targetPref) sourceOverlap = -1.0;
   if (force_unsupported_features) {
@@ -186,7 +204,11 @@ int main(int argc, char* argv[]) {
 	for (size_t i = 0;i < sourceLines.size();i++) unsupported.push_back(i);
   }
   else {
-	 overlapByRate(pairs, targetLines, sourceLines, targetOverlap, sourceOverlap);
+	 overlapByRate(pairs, targetLines, sourceLines, targetOverlap, sourceOverlap, [&features](const featureLine& i, const featureLine& j) 
+	 { return i.seqname == j.seqname && find(features.begin(), features.end(), j.type) != features.end() && i.strand == j.strand; });
+	 // Get list of opposite strands
+	 overlapByRate(nc_pairs, targetLines, sourceLines, ncTargetOverlap, ncSourceOverlap, [&features](const featureLine& i, const featureLine& j) 
+	 { return i.seqname == j.seqname && find(features.begin(), features.end(), j.type) != features.end() && i.strand != j.strand; });
   }
   
   vector<int> listLines;
@@ -198,9 +220,10 @@ int main(int argc, char* argv[]) {
 	 bool annotated = false;
 	 int indexi = i - pairs.begin();
 	 transferred = false;
-	 featureLine* ncRNA_line = NULL;
+	 
 	 cout << "Processing line " << indexi << ": " << targetLines[indexi].seqname << ", " << targetLines[indexi].start << "-" << targetLines[indexi].end << ", " << targetLines[indexi].attr << "\n";
 	 if (!i->empty()/* && find(goodseq.begin(), goodseq.end(), targetLines[indexi].seqname) != goodseq.end()*/) {
+		annotated = true;
 		for (vector<int>::iterator j = i->begin();j != i->end();j++) {
 		  int indexj = *j;
 		  //cout << "i:" << targetLines[indexi].start << "-" << targetLines[indexi].end << ", j:" << sourceLines[indexj].start << "-" << sourceLines[indexj].end << "\n";
@@ -208,8 +231,8 @@ int main(int argc, char* argv[]) {
 			c *out << targetLines[indexi].seqname << "\n" << sourceLines[indexj].seqname << "\n";
 			cout << features[0] == sourceLines[indexj].type;
 		}*/
-		  if (targetLines[indexi].seqname == sourceLines[indexj].seqname && find(features.begin(), features.end(), sourceLines[indexj].type) != features.end()) {
-			 annotated = true;
+		  
+			 
 			 // In force unsupported feature mode, remove the supported from the list
 			 if (force_unsupported_features) {
 				vector<int>::iterator supported = find(unsupported.begin(), unsupported.end(), indexj);
@@ -222,64 +245,54 @@ int main(int argc, char* argv[]) {
 			 }
 			 if (targetPref) {
 				string id = string_match(sourceLines[indexj].attr, "ID");
-				
 				transLog.push_back(id);
 			 }
-			 if (targetLines[indexi].strand == sourceLines[indexj].strand) {
-				if (find(listLines.begin(), listLines.end(), indexj) != listLines.end()) {
-				  cout << "Line dropped, source already transferred: " << sourceLines[indexj].start << "-" << sourceLines[indexj].end << "\n";
-				  continue;
-				}
-				output.push_back(sourceLines[indexj]);
-				listLines.push_back(indexj);
-				string name = string_match(sourceLines[indexj].attr, "Name");
-				cout << "Transferred annotation from range " << sourceLines[indexj].start << "-" << sourceLines[indexj].end << "(" << name << "), replacing the target feature" << "\n";
-				
-				unsigned int indexk = indexj + 1;
-				for (string parent = string_match(sourceLines[indexk].attr, "Parent"); indexk < sourceLines.size() && (parent = string_match(sourceLines[indexk].attr, "Parent")) == name;indexk++) {
-				  cout << "Transfer line " << indexk << " from source: child of " << name << "\n";
-				  output.push_back(sourceLines[indexk]);
-				  listLines.push_back(indexk);
-				  
-				}
-				transferred = true;
-			 }
-			 else {
-				// If not been marked ncRNA feature
-				  if (ncRNA_line == NULL) {
-				    	string id = string_match(sourceLines[indexj].attr, "ID");
-					ncRNA_line = new featureLine(targetLines[indexi]);
-					ncRNA_line->attr += ";gene=" + id;
-					ncRNA_line->type = "ncRNA";
-				  }
-				
-			 }
 			 
-		  }
-		}
+			if (find(listLines.begin(), listLines.end(), indexj) != listLines.end()) {
+			  cout << "Line dropped, source already transferred: " << sourceLines[indexj].start << "-" << sourceLines[indexj].end << "\n";
+			  continue;
+			}
+			output.push_back(sourceLines[indexj]);
+			listLines.push_back(indexj);
+			string name = string_match(sourceLines[indexj].attr, "Name");
+			cout << "Transferred annotation from range " << sourceLines[indexj].start << "-" << sourceLines[indexj].end << "(" << name << "), replacing the target feature" << "\n";
+			
+			unsigned int indexk = indexj + 1;
+			for (string parent = string_match(sourceLines[indexk].attr, "Parent"); indexk < sourceLines.size() && (parent = string_match(sourceLines[indexk].attr, "Parent")) == name;indexk++) {
+			  cout << "Transfer line " << indexk << " from source: child of " << name << "\n";
+			  output.push_back(sourceLines[indexk]);
+			  listLines.push_back(indexk);
+			  
+			}
+			transferred = true;
+		 }
 		// no matched feature with the same strand, check if ncRNA found
-		if (!transferred && ncRNA_line != NULL) {
-			cout << "Range " << ncRNA_line->start << "-" << ncRNA_line->end << " marked as ncRNA" << "\n";
-			output.push_back(*ncRNA_line);
-			ncRNA_line->type = "exon";
-			output.push_back(*ncRNA_line);
-		}
-		// free memory
-		if (ncRNA_line != NULL) {
-			delete ncRNA_line;
-			ncRNA_line = NULL;
-		}
+		
+		
 	 }
 	 if (!annotated) {
-		cout << "No existing annotation found at range " << targetLines[indexi].start << "-" << targetLines[indexi].end  << ", " << targetLines[indexi].attr << ", added to trinotate list\n";
-		string id = string_match(targetLines[indexi].attr, "ID");
-		listTrinotate(tempSeq, id, targetLines[indexi].start, targetLines[indexi].end, fastamap, targetLines[indexi].seqname);
-		featureLine line = targetLines[indexi];
-		output.push_back(line);
-		namemap.insert(pair<string, int>(id, output.size() - 1));
-		//cout << "namemap ID: " << id << "\n" << output[namemap[id]].end << "\n";
-		line.type = "exon";
-		output.push_back(line);
+		// ncRNA found
+		 if (!nc_pairs[indexi].empty()) {
+			string id = string_match(sourceLines[nc_pairs[indexi][0]].attr, "ID");
+			featureLine ncFeature = targetLines[indexi];
+			ncFeature.attr += ";gene=" + id;
+			ncFeature.type = "ncRNA";
+			output.push_back(ncFeature);
+			ncFeature.type = "exon";
+			output.push_back(ncFeature);
+			cout << "Range " << ncFeature.start << "-" << ncFeature.end << " marked as ncRNA" << "\n";
+		 }
+		 else {
+			cout << "No existing annotation found at range " << targetLines[indexi].start << "-" << targetLines[indexi].end  << ", " << targetLines[indexi].attr << ", added to trinotate list\n";
+			string id = string_match(targetLines[indexi].attr, "ID");
+			listTrinotate(tempSeq, id, targetLines[indexi].start, targetLines[indexi].end, fastamap, targetLines[indexi].seqname);
+			featureLine line = targetLines[indexi];
+			output.push_back(line);
+			namemap.insert(pair<string, int>(id, output.size() - 1));
+			//cout << "namemap ID: " << id << "\n" << output[namemap[id]].end << "\n";
+			line.type = "exon";
+			output.push_back(line);
+		}
 	 }
   }
   if (force_unsupported_features) {
@@ -357,7 +370,10 @@ void readFile(string filename, vector<featureLine>& lines) {
 	}
 	file.close();	
 }
-void overlapByRate(vector<vector<int> >& ret, vector<featureLine>& query, vector<featureLine>& subject, double queryoverlap, double     subjectoverlap) {
+
+// Edit: added argument for additional condition check
+
+void overlapByRate(vector<vector<int> >& ret, vector<featureLine>& query, vector<featureLine>& subject, double queryoverlap, double subjectoverlap, std::function<bool(const featureLine& i, const featureLine& j)> f) {
 
 
 	sort(subject.begin(), subject.end(), sortByStart);
@@ -367,22 +383,23 @@ void overlapByRate(vector<vector<int> >& ret, vector<featureLine>& query, vector
 		
 		for (vector<featureLine>::const_iterator j = subject.cbegin();j != subject.cend();j++) {
 			//cout << "i:" << i->start << "-" << i->end << ", j:" << j->start << "-" << j->end << "\n";
-
-			int soverlap = subjectoverlap >= 0 ? (j->end - j->start) * subjectoverlap : numeric_limits<int>::max();
-			if (j->start > i->end) break;
-			if (j->end <= i->end) {
-				if (j->end - max(i->start, j->start) >= max(qoverlap, soverlap)) {
-					ret[ret.size() - 1].push_back(j - subject.begin()); 
+			if (f(*i, *j)) {
+				int soverlap = subjectoverlap >= 0 ? (j->end - j->start) * subjectoverlap : numeric_limits<int>::max();
+				if (j->start > i->end) break;
+				if (j->end <= i->end) {
+					if (j->end - max(i->start, j->start) >= max(qoverlap, soverlap)) {
+						ret[ret.size() - 1].push_back(j - subject.begin()); 
+						
+						//cout << "included" << "\n";
+						//cout << "i:" << i->start << "-" << i->end << ", j:" << j->start << "-" << j->end << "\n";
+						}
+				}
+				else if (i->end - max(j->start, i->start) >= max(qoverlap, soverlap)){
+					ret[ret.size() - 1].push_back(j - subject.begin());
 					
-					//cout << "included" << "\n";
-					//cout << "i:" << i->start << "-" << i->end << ", j:" << j->start << "-" << j->end << "\n";
-					}
-			}
-			else if (i->end - max(j->start, i->start) >= max(qoverlap, soverlap)){
-				ret[ret.size() - 1].push_back(j - subject.begin());
-				
 
-				//cout << "i:" << i->start << "-" << i->end << ", j:" << j->start << "-" << j->end << "\n";
+					//cout << "i:" << i->start << "-" << i->end << ", j:" << j->start << "-" << j->end << "\n";
+				}
 			}
 		}
 	}
