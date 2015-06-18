@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-c -Wall -O2 -std=c++0x
+CFLAGS=-c -Wall -O2 -std=c++11
 
 all: anno_transfer
         $(CC) anno_transfer.o -o anno_transfer
