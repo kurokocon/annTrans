@@ -258,11 +258,13 @@ int main(int argc, char* argv[]) {
 			cout << "Transferred annotation from range " << sourceLines[indexj].start << "-" << sourceLines[indexj].end << "(" << name << "), replacing the target feature" << "\n";
 			
 			unsigned int indexk = indexj + 1;
-			for (string parent = string_match(sourceLines[indexk].attr, "Parent"); indexk < sourceLines.size() && (parent = string_match(sourceLines[indexk].attr, "Parent")) == name;indexk++) {
-			  cout << "Transfer line " << indexk << " from source: child of " << name << "\n";
-			  output.push_back(sourceLines[indexk]);
-			  listLines.push_back(indexk);
+			if (indexk < pairs.size()) {
+			  for (string parent = string_match(sourceLines[indexk].attr, "Parent"); indexk < sourceLines.size() && (parent = string_match(sourceLines[indexk].attr, "Parent")) == name;indexk++) {
+			    cout << "Transfer line " << indexk << " from source: child of " << name << std::endl;
+			    output.push_back(sourceLines[indexk]);
+			    listLines.push_back(indexk);
 			  
+			  }
 			}
 			transferred = true;
 		 }
