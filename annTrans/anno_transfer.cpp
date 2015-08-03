@@ -41,16 +41,18 @@ void readFile(string filename, vector<featureLine>& lines);
 void overlapByRate(vector<vector<int> >& ret, vector<featureLine>& query, vector<featureLine>& subject, double queryoverlap, double subjectoverlap, std::function<bool(const featureLine& i, const featureLine& j)> f);
 
 
-void anyOverlap(vector<vector<int> >& ret, vector<featureLine>& query, vector<featureLine>& subject) {
+void anyOverlap(vector<vector<int> >& ret, vector<featureLine>& query, vector<featureLine>& subject, std::function<bool(const featureLine& i, const featureLine& j)> f) {
   stable_sort(subject.begin(), subject.end(), sortByStart);
   for (vector<featureLine>::iterator i = query.begin();i != query.end();i++) {
 	 ret.push_back(vector<int>());
 	for (vector<featureLine>::iterator j = subject.begin();j != subject.end();j++) {
+	  if (f) {
 		 if (j->start > i->end) break;
 		 int indexj = j - subject.begin();
 		 if (j->end >= i->start) {
 			ret[ret.size() - 1].push_back(indexj);
 		}
+	  }
 	 }
   }
 }
@@ -200,12 +202,18 @@ int main(int argc, char* argv[]) {
   vector<int> unsupported;
   if (targetPref) sourceOverlap = -1.0;
   if (force_unsupported_features) {
-	 anyOverlap(pairs, targetLines, sourceLines);
+	 anyOverlap(pairs, targetLines, sourceLines, [&features](const featureLine& i, const featureLine& j) 
+	 { return i.seqname == j.seqname && find(features.begin(), features.end(), j.type) != features.end() && i.strand == j.strand; });
+	 
+	 anyOverlap(nc_pairs, targetLines, sourceLines, [&features](const featureLine& i, const featureLine& j) 
+	 { return i.seqname == j.seqname && find(features.begin(), features.end(), j.type) != features.end() && i.strand != j.strand; });
+	 
 	for (size_t i = 0;i < sourceLines.size();i++) unsupported.push_back(i);
   }
   else {
 	 overlapByRate(pairs, targetLines, sourceLines, targetOverlap, sourceOverlap, [&features](const featureLine& i, const featureLine& j) 
 	 { return i.seqname == j.seqname && find(features.begin(), features.end(), j.type) != features.end() && i.strand == j.strand; });
+
 	 // Get list of opposite strands
 	 overlapByRate(nc_pairs, targetLines, sourceLines, ncTargetOverlap, ncSourceOverlap, [&features](const featureLine& i, const featureLine& j) 
 	 { return i.seqname == j.seqname && find(features.begin(), features.end(), j.type) != features.end() && i.strand != j.strand; });
@@ -260,7 +268,7 @@ int main(int argc, char* argv[]) {
 			unsigned int indexk = indexj + 1;
 			if (indexk < pairs.size()) {
 			  for (string parent = string_match(sourceLines[indexk].attr, "Parent"); indexk < sourceLines.size() && (parent = string_match(sourceLines[indexk].attr, "Parent")) == name;indexk++) {
-			    cout << "Transfer line " << indexk << " from source: child of " << name << std::endl;
+			    cout << "Transfer line " << indexk << " from source: child of " << name << "\n";
 			    output.push_back(sourceLines[indexk]);
 			    listLines.push_back(indexk);
 			  
