@@ -11,5 +11,8 @@ To achieve this flexibility, annTrans combines:
   b) incorporating functional predictions for novel genomic features;    
   c) tunable process of comparing the genomic features predicted on the basis of DNA- and RNA-level data.     
   
-![annTrans scheme](annTrans_scheme.png)
+  
+The detailed usage instructions will appear on this page after revising of the algorithm according to the updated scheme (below) and the extensive testing. 
+  
+![annTrans scheme](annTrans2016_scheme.png)
 
